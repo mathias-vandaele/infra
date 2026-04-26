@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  front:
+    volumes:
+      - type: bind
+        source: ./
+        target: /app
+    build:
+      context: ./frontend/
+    command: bash -c "cd app/frontend && trunk serve --release --address 0.0.0.0 --port=8181"
+    environment:
+      - HOST_IP=${HOST_IP}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.dc-front.rule=Host(`distributed-computing.mathias-vandaele.dev`)"
+      - "traefik.http.routers.dc-front.entrypoints=websecure"
+      - "traefik.http.routers.dc-front.tls.certresolver=myresolver"
+      - "traefik.http.services.dc-front.loadbalancer.server.port=8181"
+    networks:
+      - traefik-public
+
+  back:
+    volumes:
+      - type: bind
+        source: ./
+        target: /app
+    build:
+      context: ./backend/
+    command: bash -c "cd app/backend && cargo run --release 0.0.0.0"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+
+      - "traefik.http.routers.dc-httpserv.rule=Host(`distributed-computing.mathias-vandaele.dev`) && Path(`/last-prime`)"
+      - "traefik.http.routers.dc-httpserv.service=dc-httpserv"
+      - "traefik.http.routers.dc-httpserv.entrypoints=websecure"
+      - "traefik.http.routers.dc-httpserv.tls.certresolver=myresolver"
+      - "traefik.http.services.dc-httpserv.loadbalancer.server.port=3030"
+
+      - "traefik.http.routers.dc-socket.rule=Host(`distributed-computing.mathias-vandaele.dev`)"
+      - "traefik.http.routers.dc-socket.service=dc-socket"
+      - "traefik.http.routers.dc-socket.entrypoints=websocket"
+      - "traefik.http.routers.dc-socket.tls.certresolver=myresolver"
+      - "traefik.http.services.dc-socket.loadbalancer.server.port=7878"
+    networks:
+      - traefik-public
+
+networks:
+  traefik-public:
+    external: true
